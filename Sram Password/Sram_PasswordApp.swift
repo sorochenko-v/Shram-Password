@@ -16,6 +16,7 @@ struct Sram_PasswordApp: App {
                 }
             }
             .environment(viewModel)
+            .preferredColorScheme(.dark)
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)

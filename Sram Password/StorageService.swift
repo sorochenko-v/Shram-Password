@@ -1,3 +1,5 @@
+//  StorageService.swift
+
 import Foundation
 import CryptoKit
 import LocalAuthentication
@@ -16,15 +18,15 @@ enum StorageError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .documentsNotFound: "Documents directory not found."
-        case .fileNotFound:      "Vault file not found."
-        case .accessControlFailed: "Access control creation failed."
+        case .documentsNotFound:        "Documents directory not found."
+        case .fileNotFound:             "Vault file not found."
+        case .accessControlFailed:      "Access control creation failed."
         case .keychainSaveFailed(let s): "Keychain save error: \(s)"
         case .keychainRetrieveFailed(let s): "Keychain retrieval error: \(s)"
         case .keychainDeleteFailed(let s): "Keychain delete error: \(s)"
-        case .userCanceled:       "Authentication cancelled."
-        case .authenticationFailed: "Biometric authentication failed."
-        case .noKeyMaterial:      "No stored key material."
+        case .userCanceled:             "Authentication cancelled."
+        case .authenticationFailed:     "Biometric authentication failed."
+        case .noKeyMaterial:            "No stored key material."
         }
     }
 }
@@ -39,7 +41,7 @@ actor StorageService {
     private let service = "com.sram.password"
     private let keyAccount = "keyMaterial"
 
-    func vaultFileURL() throws -> URL {
+    private func vaultFileURL() throws -> URL {
         guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             throw StorageError.documentsNotFound
         }
@@ -77,10 +79,10 @@ actor StorageService {
             throw StorageError.accessControlFailed
         }
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
+            kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: keyAccount,
-            kSecValueData as String: encoded,
+            kSecValueData as String:   encoded,
             kSecAttrAccessControl as String: accessControl
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -94,13 +96,13 @@ actor StorageService {
             DispatchQueue.global().async {
                 let context = LAContext()
                 let query: [String: Any] = [
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: self.service,
-                    kSecAttrAccount as String: self.keyAccount,
-                    kSecReturnData as String: true,
-                    kSecMatchLimit as String: kSecMatchLimitOne,
+                    kSecClass as String:               kSecClassGenericPassword,
+                    kSecAttrService as String:         self.service,
+                    kSecAttrAccount as String:         self.keyAccount,
+                    kSecReturnData as String:          true,
+                    kSecMatchLimit as String:          kSecMatchLimitOne,
                     kSecUseAuthenticationContext as String: context,
-                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIAllow
+                    kSecUseAuthenticationUI as String:     kSecUseAuthenticationUIAllow
                 ]
                 var item: CFTypeRef?
                 let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -124,7 +126,7 @@ actor StorageService {
 
     func deleteKeyMaterial() throws {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
+            kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: keyAccount
         ]

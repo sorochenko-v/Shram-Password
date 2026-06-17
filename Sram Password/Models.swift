@@ -1,37 +1,40 @@
 //  Models.swift
 
-import Foundation
+import SwiftUI
+
+extension Color {
+    static let sramRed = Color(red: 0.55, green: 0, blue: 0)
+}
+
+enum EntryType: String, Codable, CaseIterable, Identifiable {
+    case website = "Website"
+    case app = "App"
+    var id: Self { self }
+}
+
+struct Category: Identifiable, Codable, Equatable {
+    var id: UUID = UUID()
+    var name: String
+    var colorHex: String
+
+    static func == (lhs: Category, rhs: Category) -> Bool { lhs.id == rhs.id }
+}
 
 struct PasswordEntry: Identifiable, Codable, Equatable {
-    let id: UUID
+    var id: UUID = UUID()
     var title: String
     var username: String
     var password: String
-    var website: String
     var notes: String
-    let createdAt: Date
+    var website: String
+    var type: EntryType = .website
+    var categoryId: UUID?
+    var createdAt: Date = Date()
 
-    init(id: UUID = UUID(),
-         title: String,
-         username: String,
-         password: String,
-         website: String = "",
-         notes: String = "",
-         createdAt: Date = Date()) {
-        self.id = id
-        self.title = title
-        self.username = username
-        self.password = password
-        self.website = website
-        self.notes = notes
-        self.createdAt = createdAt
-    }
+    static func == (lhs: PasswordEntry, rhs: PasswordEntry) -> Bool { lhs.id == rhs.id }
 }
 
 struct Vault: Codable, Equatable {
-    var entries: [PasswordEntry]
-
-    init(entries: [PasswordEntry] = []) {
-        self.entries = entries
-    }
+    var entries: [PasswordEntry] = []
+    var categories: [Category] = []
 }
