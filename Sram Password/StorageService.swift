@@ -15,6 +15,7 @@ enum StorageError: LocalizedError {
     case userCanceled
     case authenticationFailed
     case noKeyMaterial
+    case importFailed
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,7 @@ enum StorageError: LocalizedError {
         case .userCanceled:             "Authentication cancelled."
         case .authenticationFailed:     "Biometric authentication failed."
         case .noKeyMaterial:            "No stored key material."
+        case .importFailed:             "Failed to import vault data."
         }
     }
 }
@@ -48,6 +50,10 @@ actor StorageService {
         return docs.appendingPathComponent(vaultFileName)
     }
 
+    func getVaultFileURL() throws -> URL {
+        return try vaultFileURL()
+    }
+
     func saveEncryptedVault(data: Data) throws {
         var url = try vaultFileURL()
         try data.write(to: url, options: .atomic)
@@ -62,6 +68,10 @@ actor StorageService {
             throw StorageError.fileNotFound
         }
         return try Data(contentsOf: url)
+    }
+
+    func overwriteVaultFile(with data: Data) throws {
+        try saveEncryptedVault(data: data)
     }
 
     func storeKeyMaterial(key: SymmetricKey, salt: Data) async throws {

@@ -6,13 +6,13 @@ extension Color {
     static let sramRed = Color(red: 0.55, green: 0, blue: 0)
 }
 
-enum EntryType: String, Codable, CaseIterable, Identifiable {
+enum EntryType: String, Codable, CaseIterable, Identifiable, Sendable {
     case website = "Website"
     case app = "App"
     var id: Self { self }
 }
 
-struct Category: Identifiable, Codable, Equatable {
+struct Category: Identifiable, Codable, Equatable, Sendable {
     var id: UUID = UUID()
     var name: String
     var colorHex: String
@@ -20,7 +20,7 @@ struct Category: Identifiable, Codable, Equatable {
     static func == (lhs: Category, rhs: Category) -> Bool { lhs.id == rhs.id }
 }
 
-struct PasswordEntry: Identifiable, Codable, Equatable {
+struct PasswordEntry: Identifiable, Codable, Equatable, Sendable {
     var id: UUID = UUID()
     var title: String
     var username: String
@@ -34,7 +34,7 @@ struct PasswordEntry: Identifiable, Codable, Equatable {
     static func == (lhs: PasswordEntry, rhs: PasswordEntry) -> Bool { lhs.id == rhs.id }
 }
 
-struct Vault: Codable, Equatable {
+struct Vault: Codable, Equatable, Sendable {
     var entries: [PasswordEntry] = []
     var categories: [Category] = []
 }

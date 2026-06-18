@@ -9,6 +9,7 @@ final class VaultViewModel {
     var entries: [PasswordEntry] = []
     var categories: [Category] = []
     var isUnlocked = false
+    var showSupportPopup = false
 
     private var encryptionKey: SymmetricKey?
     private var salt: Data?
@@ -41,6 +42,7 @@ final class VaultViewModel {
             entries = vault.entries
             categories = vault.categories
             isUnlocked = true
+            showSupportPopup = true
             try? await storageService.storeKeyMaterial(key: key, salt: salt)
         } else {
             let salt = await cryptoService.generateSalt()
@@ -58,6 +60,7 @@ final class VaultViewModel {
             entries = []
             categories = defaultCategories
             isUnlocked = true
+            showSupportPopup = true
         }
     }
 
@@ -72,6 +75,7 @@ final class VaultViewModel {
         encryptionKey = key
         salt = material.salt
         isUnlocked = true
+        showSupportPopup = true
     }
 
     @MainActor
@@ -90,6 +94,32 @@ final class VaultViewModel {
             try? FileManager.default.removeItem(at: url)
         }
         try? await storageService.deleteKeyMaterial()
+    }
+
+    @MainActor
+    func exportVaultData() -> Data? {
+        guard let url = vaultFileURL,
+              FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    @MainActor
+    func importVaultData(from url: URL) async throws {
+        guard url.startAccessingSecurityScopedResource() else {
+            throw StorageError.importFailed
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw StorageError.importFailed
+        }
+
+        guard data.count > 16 else { throw StorageError.importFailed }
+        try await storageService.overwriteVaultFile(with: data)
+        lock()
     }
 
     @MainActor
@@ -119,6 +149,15 @@ final class VaultViewModel {
         guard isUnlocked, let key = encryptionKey, let salt else { return }
         let newCategory = Category(name: name, colorHex: colorHex)
         categories.append(newCategory)
+        try await persistVault(key: key, salt: salt)
+    }
+
+    @MainActor
+    func updateCategory(_ category: Category, newName: String, newColorHex: String) async throws {
+        guard isUnlocked, let key = encryptionKey, let salt,
+              let idx = categories.firstIndex(where: { $0.id == category.id }) else { return }
+        categories[idx].name = newName
+        categories[idx].colorHex = newColorHex
         try await persistVault(key: key, salt: salt)
     }
 

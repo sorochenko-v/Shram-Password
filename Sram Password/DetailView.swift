@@ -1,4 +1,4 @@
-//  DetailView.swift
+// DetailView.swift
 
 import SwiftUI
 import Security
@@ -194,7 +194,7 @@ struct DetailView: View {
                                 .font(.caption).fontWeight(.semibold).foregroundColor(.gray)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                            TextField("Name", text: $newCategoryName)
+                            TextField("", text: $newCategoryName)
                                 .padding(10)
                                 .background(Color(white: 0.2))
                                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(white: 0.3), lineWidth: 1))
@@ -386,20 +386,5 @@ struct DetailView: View {
             try? await viewModel.deleteEntry(entry)
             dismiss()
         }
-    }
-}
-
-extension Color {
-    func toHex() -> String {
-        #if canImport(UIKit)
-        let uic = UIColor(self)
-        #elseif canImport(AppKit)
-        let uic = NSColor(self)
-        #endif
-        guard let components = uic.cgColor.components else { return "#FF0000" }
-        let r = Int(components[0] * 255)
-        let g = Int(components[1] * 255)
-        let b = Int(components[2] * 255)
-        return String(format: "#%02X%02X%02X", r, g, b)
     }
 }
