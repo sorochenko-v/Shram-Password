@@ -69,7 +69,7 @@ struct MainListView: View {
                             }
                         }
                     }
-                    .navigationTitle("Sram")
+                    .navigationTitle("Passwords")
                     .toolbar {
                         ToolbarItemGroup(placement: .primaryAction) {
                             Button { viewModel.lock() } label: {
