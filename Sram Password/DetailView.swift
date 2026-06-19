@@ -1,7 +1,92 @@
-// DetailView.swift
+//  DetailView.swift
 
 import SwiftUI
 import Security
+
+// MARK: - Custom Masked TextField (avoids SecureField to bypass iOS password heuristics)
+
+private struct MaskedTextField: UIViewRepresentable {
+    @Binding var text: String
+    var isMasked: Bool
+    var placeholder: String
+    var onCommit: (() -> Void)?
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.delegate = context.coordinator
+        field.autocorrectionType = .no
+        field.spellCheckingType = .no
+        field.textContentType = .none
+        field.isSecureTextEntry = false
+        field.returnKeyType = .next
+        field.keyboardType = .asciiCapable
+        field.placeholder = placeholder
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        if !context.coordinator.isEditing {
+            uiView.text = isMasked ? String(repeating: "●", count: text.count) : text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, isMasked: isMasked, onCommit: onCommit)
+    }
+
+    class Coordinator: NSObject, UITextFieldDelegate {
+        @Binding var text: String
+        var isMasked: Bool
+        var onCommit: (() -> Void)?
+        var isEditing = false
+
+        init(text: Binding<String>, isMasked: Bool, onCommit: (() -> Void)?) {
+            _text = text
+            self.isMasked = isMasked
+            self.onCommit = onCommit
+        }
+
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            isEditing = true
+            // When editing, show real text if password visible, else still masked
+            textField.text = isMasked ? String(repeating: "●", count: text.count) : text
+        }
+
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            isEditing = false
+            textField.text = isMasked ? String(repeating: "●", count: text.count) : text
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            onCommit?()
+            textField.resignFirstResponder()
+            return true
+        }
+
+        func textField(_ textField: UITextField,
+                       shouldChangeCharactersIn range: NSRange,
+                       replacementString string: String) -> Bool {
+            // Calculate new real password
+            let current = text as NSString
+            let new = current.replacingCharacters(in: range, with: string)
+            text = new
+
+            // Update displayed text accordingly
+            textField.text = isMasked ? String(repeating: "●", count: new.count) : new
+
+            // Move cursor to end (since we manually set text, cursor resets)
+            if let newPosition = textField.position(from: textField.beginningOfDocument,
+                                                    offset: new.count) {
+                textField.selectedTextRange = textField.textRange(from: newPosition, to: newPosition)
+            }
+
+            return false
+        }
+    }
+}
+
+// MARK: - DetailView
 
 struct DetailView: View {
     @Environment(VaultViewModel.self) private var viewModel
@@ -24,6 +109,7 @@ struct DetailView: View {
     @State private var newCategoryName = ""
     @State private var newCategoryColorHex = "#FF9500"
     @State private var customColor = Color.orange
+    @State private var showValidationErrors = false
 
     private let presetColors: [(String, Color)] = [
         ("#FF9500", .orange),
@@ -55,39 +141,10 @@ struct DetailView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    labeledField("TITLE") {
-                        TextField("", text: $title)
-                            .foregroundColor(.white)
-                    }
-                    labeledField("USERNAME") {
-                        TextField("", text: $username)
-                            .foregroundColor(.white)
-                    }
-                    labeledField("PASSWORD") {
-                        HStack(spacing: 8) {
-                            Group {
-                                if showPassword {
-                                    TextField("", text: $password)
-                                } else {
-                                    SecureField("", text: $password)
-                                }
-                            }
-                            .foregroundColor(.white)
+                    requiredField("TITLE", text: $title)
+                    requiredField("USERNAME OR EMAIL", text: $username)
 
-                            Button { showPassword.toggle() } label: {
-                                Image(systemName: showPassword ? "eye.slash" : "eye")
-                                    .foregroundColor(.gray)
-                            }
-                            .buttonStyle(.plain)
-
-                            Button { copy(password) } label: {
-                                Image(systemName: "doc.on.doc")
-                                    .foregroundColor(.sramRed)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(password.isEmpty)
-                        }
-                    }
+                    requiredPasswordField("PASSWORD", text: $password)
 
                     VStack(alignment: .leading, spacing: 4) {
                         GeometryReader { geo in
@@ -129,14 +186,12 @@ struct DetailView: View {
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.sramRed, lineWidth: 1))
                     }
 
-                    if type == .website {
-                        labeledField("WEBSITE URL") {
-                            TextField("", text: $website)
-                                .foregroundColor(.white)
-                        }
+                    labeledField(type == .website ? "WEBSITE URL" : "APP NAME") {
+                        TextField("", text: $website)
+                            .textContentType(.none)
+                            .foregroundColor(.white)
                     }
 
-                    // Category picker
                     VStack(alignment: .leading, spacing: 6) {
                         Text("CATEGORY")
                             .font(.caption).fontWeight(.semibold).foregroundColor(.gray)
@@ -161,7 +216,7 @@ struct DetailView: View {
                             Button {
                                 showCreateCategory = true
                             } label: {
-                                Label("+ Create New Category", systemImage: "plus")
+                                Label("Create New Category", systemImage: "plus")
                             }
                         } label: {
                             HStack {
@@ -187,7 +242,6 @@ struct DetailView: View {
                         }
                     }
 
-                    // Inline create new category
                     if showCreateCategory {
                         VStack(spacing: 12) {
                             Text("NEW CATEGORY")
@@ -195,6 +249,7 @@ struct DetailView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
                             TextField("", text: $newCategoryName)
+                                .textContentType(.none)
                                 .padding(10)
                                 .background(Color(white: 0.2))
                                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(white: 0.3), lineWidth: 1))
@@ -258,14 +313,13 @@ struct DetailView: View {
                     }
 
                     VStack(spacing: 12) {
-                        Button("Save") { save() }
+                        Button("Save") { handleSave() }
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.sramRed)
+                            .background(isSaveDisabled ? Color(white: 0.3) : Color.sramRed)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty)
 
                         if !isNew {
                             Button("Delete Entry") { showDeleteAlert = true }
@@ -289,6 +343,86 @@ struct DetailView: View {
             Button("Delete", role: .destructive) { delete() }
         } message: {
             Text("This action cannot be undone.")
+        }
+    }
+
+    private var isSaveDisabled: Bool {
+        title.trimmingCharacters(in: .whitespaces).isEmpty ||
+        username.trimmingCharacters(in: .whitespaces).isEmpty ||
+        password.isEmpty
+    }
+
+    private func handleSave() {
+        if isSaveDisabled {
+            showValidationErrors = true
+        } else {
+            save()
+        }
+    }
+
+    // MARK: - Custom Fields
+
+    private func requiredField(_ label: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption).fontWeight(.semibold).foregroundColor(.gray)
+
+            TextField("", text: text)
+                .textContentType(.none)
+                .foregroundColor(.white)
+                .padding(10)
+                .background(Color(white: 0.2))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(showValidationErrors && text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty
+                                ? Color.sramRed : Color(white: 0.3), lineWidth: 1)
+                )
+
+            if showValidationErrors && text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text("Required field")
+                    .font(.caption2)
+                    .foregroundColor(.sramRed)
+            }
+        }
+    }
+
+    private func requiredPasswordField(_ label: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption).fontWeight(.semibold).foregroundColor(.gray)
+
+            HStack(spacing: 8) {
+                MaskedTextField(text: text, isMasked: !showPassword, placeholder: "")
+                    .frame(height: 20)
+                    .padding(.vertical, 10)
+                    .foregroundColor(.white)
+
+                Button { showPassword.toggle() } label: {
+                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+
+                Button { copy(text.wrappedValue) } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundColor(.sramRed)
+                }
+                .buttonStyle(.plain)
+                .disabled(text.wrappedValue.isEmpty)
+            }
+            .padding(.horizontal, 10)
+            .background(Color(white: 0.2))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(showValidationErrors && text.wrappedValue.isEmpty
+                            ? Color.sramRed : Color(white: 0.3), lineWidth: 1)
+            )
+
+            if showValidationErrors && text.wrappedValue.isEmpty {
+                Text("Required field")
+                    .font(.caption2)
+                    .foregroundColor(.sramRed)
+            }
         }
     }
 

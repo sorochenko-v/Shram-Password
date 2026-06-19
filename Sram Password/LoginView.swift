@@ -1,7 +1,81 @@
-// LoginView.swift
+//  LoginView.swift
 
 import SwiftUI
 import LocalAuthentication
+
+// MARK: - Seeded Random Generator
+
+private struct SeededRandom: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: Int) {
+        state = UInt64(seed)
+    }
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return state
+    }
+}
+
+// MARK: - Matrix Digital Rain Background
+
+struct MatrixRainBackground: View {
+    private let fontSize: CGFloat = 14
+    private let columnSpacing: CGFloat = 18
+    private let chars = "SHRAM0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+-="
+
+    var body: some View {
+        GeometryReader { geometry in
+            TimelineView(.animation) { timeline in
+                Canvas { context, size in
+                    let time = timeline.date.timeIntervalSinceReferenceDate
+                    let columnsCount = max(1, Int(size.width / columnSpacing))
+
+                    for i in 0..<columnsCount {
+                        let x = CGFloat(i) * columnSpacing + columnSpacing / 2
+                        let columnChars = generateColumnChars(seed: i)
+                        let speed = 25.0 + Double(i % 7) * 3.0
+                        let headY = CGFloat(time * speed).truncatingRemainder(
+                            dividingBy: size.height + CGFloat(columnChars.count) * (fontSize + 2)
+                        )
+
+                        for (index, char) in columnChars.enumerated() {
+                            let y = headY - CGFloat(index) * (fontSize + 2)
+                            if y > -fontSize && y < size.height + fontSize {
+                                let opacity = max(0.15, 1.0 - Double(index) / Double(columnChars.count) * 1.2)
+                                context.draw(
+                                    Text(String(char))
+                                        .font(.system(size: fontSize, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.sramRed.opacity(opacity)),
+                                    at: CGPoint(x: x, y: y)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .background(Color.black)
+        .ignoresSafeArea()
+    }
+
+    private func generateColumnChars(seed: Int) -> [Character] {
+        var rng = SeededRandom(seed: seed)
+        let length = 8 + Int(rng.next() % 18)
+        return (0..<length).map { _ in chars.randomElement(using: &rng)! }
+    }
+}
+
+// MARK: - Solid White "SHRAM" Logo
+
+private struct SramLogo: View {
+    var body: some View {
+        Text("SHRAM")
+            .font(.system(size: 68, weight: .black, design: .default))
+            .foregroundColor(.white)
+    }
+}
+
+// MARK: - Login View
 
 struct LoginView: View {
     @Environment(VaultViewModel.self) private var viewModel
@@ -14,15 +88,17 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.08).ignoresSafeArea()
+            // Matrix digital rain background
+            MatrixRainBackground()
+
+            // Foreground UI
             VStack(spacing: 24) {
                 Spacer()
 
                 if viewModel.hasVault {
-                    Text("Sram")
-                        .font(.system(size: 42, weight: .bold, design: .default))
-                        .foregroundColor(.white)
-                        .tracking(2)
+                    SramLogo()
+                        .padding(.bottom, 8)
+
                     Text("Password Manager")
                         .font(.headline)
                         .foregroundColor(.gray)
@@ -41,6 +117,9 @@ struct LoginView: View {
                         .background(Color(white: 0.2))
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(white: 0.3), lineWidth: 1))
                         .foregroundColor(.white)
+                        .textContentType(.none)
+                        .autocorrectionDisabled(true)
+                        .textInputAutocapitalization(.never)
                         .submitLabel(.go)
                         .onSubmit { unlockAction() }
                 }
