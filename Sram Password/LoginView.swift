@@ -1,7 +1,10 @@
+//  LoginView.swift
+
 import SwiftUI
 import LocalAuthentication
 
-// MARK: - Seeded Random (для стабільних символів дощу)
+// MARK: - Seeded Random Generator
+
 private struct SeededRandom: RandomNumberGenerator {
     private var state: UInt64
     init(seed: Int) { state = UInt64(seed) }
@@ -11,7 +14,8 @@ private struct SeededRandom: RandomNumberGenerator {
     }
 }
 
-// MARK: - Matrix Digital Rain (тільки для темного режиму)
+// MARK: - Matrix Digital Rain (прозоре тло, червоні символи)
+
 struct MatrixRainBackground: View {
     private let fontSize: CGFloat = 14
     private let columnSpacing: CGFloat = 18
@@ -58,7 +62,8 @@ struct MatrixRainBackground: View {
     }
 }
 
-// MARK: - Logo
+// MARK: - Solid White "SHRAM" Logo (адаптивний колір)
+
 private struct SramLogo: View {
     var body: some View {
         Text("SHRAM")
@@ -68,9 +73,9 @@ private struct SramLogo: View {
 }
 
 // MARK: - Login View
+
 struct LoginView: View {
     @Environment(VaultViewModel.self) private var viewModel
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var masterPassword = ""
     @State private var errorMessage: String?
@@ -80,12 +85,13 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            if colorScheme == .dark {
-                MatrixRainBackground()
-            } else {
-                Color.sramBackground.ignoresSafeArea()
-            }
+            // Адаптивний фон
+            Color.sramBackground.ignoresSafeArea()
 
+            // Ефект падаючих червоних символів (прозоре тло, видно в обох темах)
+            MatrixRainBackground()
+
+            // UI поверх ефекту
             VStack(spacing: 24) {
                 Spacer()
 
@@ -173,26 +179,33 @@ struct LoginView: View {
         } message: { Text($0) }
         .alert("Wipe All Data?", isPresented: $showWipeAlert) {
             Button("Cancel", role: .cancel) {}
-            Button("Wipe", role: .destructive) { Task { await viewModel.wipeAllDataAndReset() } }
+            Button("Wipe", role: .destructive) {
+                Task { await viewModel.wipeAllDataAndReset() }
+            }
         } message: {
             Text("This will permanently delete all your stored passwords. This action cannot be undone.")
         }
     }
 
     private var biometricIcon: String {
-        let ctx = LAContext(); var err: NSError?
+        let ctx = LAContext()
+        var err: NSError?
         _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
         return ctx.biometryType == .faceID ? "faceid" : "touchid"
     }
     private var biometricTitle: String {
-        let ctx = LAContext(); var err: NSError?
+        let ctx = LAContext()
+        var err: NSError?
         _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
         return ctx.biometryType == .faceID ? "Use Face ID" : "Use Touch ID"
     }
+
     private func checkBiometrics() {
-        let ctx = LAContext(); var err: NSError?
+        let ctx = LAContext()
+        var err: NSError?
         biometricAvailable = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
     }
+
     private func unlockAction() {
         Task {
             do {
@@ -204,6 +217,7 @@ struct LoginView: View {
             }
         }
     }
+
     private func unlockWithBiometrics() {
         Task {
             do {
